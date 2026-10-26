@@ -8,9 +8,15 @@
   'use strict';
   if (typeof window.claude !== 'undefined') return;
 
-  const H = { 'Content-Type': 'application/json', 'X-LQ': '1' };
+  // Backend URL comes from js/config.js. "" = same origin (server.js serves the game). null/"" on github.io = no backend.
+  const BASE = (window.LQ_API_BASE || '').replace(/\/+$/, '');
+  const NO_BACKEND = !BASE && /\.github\.io$/.test(location.hostname);
+  const TK = 'lq_token';
+  const getTok = () => { try { return localStorage.getItem(TK); } catch (e) { return null; } };
   async function api(method, url, body) {
-    const r = await fetch(url, { method, headers: H, credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body) });
+    const headers = { 'Content-Type': 'application/json', 'X-LQ': '1' };
+    const tok = getTok(); if (tok) headers.Authorization = 'Bearer ' + tok;
+    const r = await fetch(BASE + url, { method, headers, credentials: BASE ? 'omit' : 'same-origin', body: body === undefined ? undefined : JSON.stringify(body) });
     if (!r.ok) throw new Error(method + ' ' + url + ' -> ' + r.status);
     return r.json();
   }
@@ -38,7 +44,13 @@
     // and the game transparently falls back to localStorage.
     async user() {
       let id = null;
-      try { id = (await api('POST', '/api/session')).id; } catch (e) { /* offline -> local only */ }
+      if (!NO_BACKEND) {
+        try {
+          const j = await api('POST', '/api/session');
+          id = j.id;
+          if (j.token) { try { localStorage.setItem(TK, j.token); } catch (e) {} }
+        } catch (e) { /* offline -> local only */ }
+      }
       return { id: async () => id };
     },
     async db() { return { doc: () => profileRef }; }, // game asks for "data/users/<id>/profile"; the server scopes by session cookie
