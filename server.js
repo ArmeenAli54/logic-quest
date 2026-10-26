@@ -99,7 +99,7 @@ function applyCors(req, res) {
   if (origin && CORS_ORIGINS.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-LQ');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-LQ, Authorization');
     res.setHeader('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
     res.setHeader('Vary', 'Origin');
   }
@@ -122,13 +122,15 @@ async function handleApi(req, res, url) {
   }
 
   // Session bootstrap: returns existing user or creates a guest account
-  let userId = store.userFromToken(parseCookies(req)[COOKIE]);
+  const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  let userId = store.userFromToken(bearer || parseCookies(req)[COOKIE]);
   if (method === 'POST' && parts[0] === 'session') {
     if (!userId) {
       if (limited('new:' + ip, 40, 60 * 60_000)) return send(res, 429, { error: 'Too many new accounts from this address' });
       const u = store.createUser();
       setSessionCookie(res, u.token);
       userId = u.userId;
+      return send(res, 200, { id: userId, token: u.token }); // token is shown once; cross-site clients keep it and send it as a Bearer header
     }
     return send(res, 200, { id: userId });
   }

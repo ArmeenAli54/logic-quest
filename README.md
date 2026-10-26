@@ -55,6 +55,20 @@ git remote add origin https://github.com/<you>/logic-quest.git
 git push -u origin main
 ```
 
+## GitHub Pages
+Pages hosts static files only, so `server.js` cannot run there. Two options:
+
+**A) Pages only (no server).** Game works fully; progress is saved in each player's own browser.
+1. Push to GitHub (`main` branch).
+2. Repo > Settings > Pages > Source: **GitHub Actions**.
+3. The included workflow `.github/workflows/pages.yml` publishes `public/` on every push.
+   Live at `https://<you>.github.io/<repo>/`.
+
+**B) Pages + external backend (progress saved server-side).**
+1. Deploy this repo to Render/Railway/Fly (see Deploy above) and set `CORS_ORIGINS=https://<you>.github.io`.
+2. Edit `public/js/config.js`: `window.LQ_API_BASE = "https://your-app.onrender.com";`
+3. Commit and push. Pages redeploys automatically.
+
 ## Notes
 - Scores are saved from the browser, so the leaderboard is honor-system (fine for a classroom/arcade game, not for prizes).
 - Guest accounts are tied to one browser's cookie. Clearing cookies starts a fresh account. Cross-device login would need email/password or OAuth (can be added).

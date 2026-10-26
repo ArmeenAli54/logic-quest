@@ -34,6 +34,13 @@ server.listen(0, async () => {
       assert.match(r.headers.get('set-cookie'), /HttpOnly/);
       const again = await call(A, 'POST', '/api/session'); assert.equal(again.json.id, r.json.id); // idempotent
     });
+    await t('Bearer token auth works without cookies (cross-site mode)', async () => {
+      const r = await fetch(base + '/api/session', { method: 'POST', headers: { 'X-LQ': '1' } }); const j = await r.json();
+      assert.ok(j.token);
+      const me = await fetch(base + '/api/me', { headers: { Authorization: 'Bearer ' + j.token } });
+      assert.equal((await me.json()).id, j.id);
+      assert.equal((await fetch(base + '/api/me', { headers: { Authorization: 'Bearer nope' } })).status, 401);
+    });
     await t('new profile does not exist yet', async () => { assert.equal((await call(A, 'GET', '/api/profile')).json.exists, false); });
     await t('profile round-trip; unknown keys dropped', async () => {
       const p = { name: 'Ada', pts: 120, stars: { L1: 3 }, done: { L1: true }, snd: false, evil: '<script>' };
@@ -77,7 +84,7 @@ server.listen(0, async () => {
     await t('game adapter flow (same calls as dbInit) works end-to-end', async () => {
       // Run the real browser adapter in a fake window, with fetch bound to a cookie jar
       const J = jar();
-      global.window = {}; global.document = { body: { appendChild() {} }, createElement: () => ({ click() {}, remove() {} }) };
+      const mem = {}; global.localStorage = { getItem: (k) => mem[k] ?? null, setItem: (k, v) => { mem[k] = v; } }; global.location = { hostname: 'localhost' }; global.window = { LQ_API_BASE: '' }; global.document = { body: { appendChild() {} }, createElement: () => ({ click() {}, remove() {} }) };
       global.URL.createObjectURL = () => 'blob:x'; global.URL.revokeObjectURL = () => {};
       const realFetch = global.fetch;
       global.fetch = (u, o = {}) => realFetch(base + u, { ...o, headers: { ...o.headers, Cookie: J.get() } }).then((r) => { J.set(r.headers.get('set-cookie')); return r; });
